@@ -621,7 +621,17 @@ with tab4:
 
                 with pd.ExcelWriter(output, engine="openpyxl") as writer:
                     df_final.to_excel(writer, sheet_name="Detalhamento", index=False)
-                    relatorio.to_excel(writer, sheet_name="Consolidado", index=False)
+                    
+                    # Adicionar linha de total no relatório consolidado
+                    linha_total = pd.DataFrame({
+                        coluna_grupo: ['TOTAL'],
+                        'Custo Total Mensal': [relatorio['Custo Total Mensal'].sum()],
+                        'Custo Total Anual': [relatorio['Custo Total Anual'].sum()],
+                        'Quantidade': [relatorio['Quantidade'].sum()]
+                    })
+                    
+                    relatorio_com_total = pd.concat([relatorio, linha_total], ignore_index=True)
+                    relatorio_com_total.to_excel(writer, sheet_name="Consolidado", index=False)
 
                 st.download_button(
                     "📥 Baixar Relatório Excel Completo",
