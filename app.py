@@ -32,34 +32,50 @@ div[data-testid="stMetric"]:hover {
 </style>
 """, unsafe_allow_html=True)
 
+# ---------------- CONSTANTES ----------------
+TETO_INSS_2025 = 8157.41  # Atualizar conforme ano vigente
+
 # ---------------- FUNÇÃO DE CÁLCULO ----------------
-def calcular_custos(salario, regime, incluir, n_pass, v_pass, vr, va, saude, odonto, seguro, home, epi, outros):
+def calcular_custos(salario, regime, incluir, n_pass, v_pass, vr, va, saude, odonto, seguro, home, epi, outros, rat_perc=2.0, terceiros_perc=5.8):
     custos = {}
 
     if "CLT" in regime:
-
+        # Provisões
         decimo = salario / 12 if incluir else 0
-        ferias = ((salario / 12) + ((salario / 3) / 12)) if incluir else 0
+        ferias = (salario / 12) + (salario / 3 / 12) if incluir else 0
+        
+        # FGTS
         fgts = salario * 0.08
         multa = fgts * 0.40
 
+        # Vale Transporte
         vt_total = (n_pass * v_pass) * 22
-        desc = salario * 0.06
-        vt = max(0, vt_total - desc)
+        desc_max = salario * 0.06
+        desc_real = min(vt_total, desc_max)  # Desconta o menor valor
+        vt = max(0, vt_total - desc_real)
 
+        # INSS e Encargos (apenas para Lucro Presumido/Real)
         inss = 0
         rat = 0
+        terceiros = 0
+        
         if regime == "CLT (Lucro Presumido/Real)":
-            inss = salario * 0.20
-            rat = salario * 0.078
+            # Base de cálculo limitada ao teto
+            base_inss = min(salario, TETO_INSS_2025)
+            
+            inss = base_inss * 0.20  # INSS Patronal
+            rat = base_inss * (rat_perc / 100)  # RAT conforme grau de risco
+            terceiros = base_inss * (terceiros_perc / 100)  # Sistema S
 
         custos = {
-            "13º Salário (Provisão)": decimo,
-            "Férias + 1/3 (Provisão)": ferias,
-            "FGTS Mensal": fgts,
+            "Salário Base": salario,
+            "13º Salário (Provisão Mensal)": decimo,
+            "Férias + 1/3 (Provisão Mensal)": ferias,
+            "FGTS Mensal (8%)": fgts,
             "Provisão Multa FGTS (40%)": multa,
-            "INSS Patronal": inss,
-            "RAT/Sistema S/Terceiros": rat,
+            "INSS Patronal (20%)": inss,
+            f"RAT ({rat_perc}%)": rat,
+            f"Terceiros/Sistema S ({terceiros_perc}%)": terceiros,
             "Vale Transporte (Custo Empresa)": vt,
             "Vale Refeição": vr,
             "Vale Alimentação": va,
@@ -71,17 +87,29 @@ def calcular_custos(salario, regime, incluir, n_pass, v_pass, vr, va, saude, odo
             "Outros Custos": outros,
         }
 
-    else:
+    else:  # PJ
         custos = {
-            "Valor Nota Fiscal": salario,
-            "Benefícios": vr + va,
-            "Saúde/Seguros": saude + odonto + seguro,
-            "Infraestrutura": home + epi + outros,
+            "Valor Nota Fiscal (PJ)": salario,
+            "Vale Refeição": vr,
+            "Vale Alimentação": va,
+            "Plano de Saúde": saude,
+            "Plano Odontológico": odonto,
+            "Seguro de Vida": seguro,
+            "Auxílio Home Office": home,
+            "Equipamentos": epi,
+            "Outros Custos": outros,
         }
 
     total = sum(custos.values())
-    custos["Custo Total Mensal"] = total
-    custos["Custo Total Anual"] = total * 12
+    
+    # Removendo o salário base do total (não é custo adicional)
+    if "CLT" in regime:
+        total_sem_salario = total - salario
+    else:
+        total_sem_salario = total
+    
+    custos["Custo Total Mensal"] = total_sem_salario
+    custos["Custo Total Anual"] = total_sem_salario * 12
 
     return custos
 
@@ -91,28 +119,38 @@ with st.sidebar:
     st.header("⚙️ Parâmetros Detalhados")
 
     with st.expander("📌 Dados Contratuais", expanded=True):
-        salario = st.number_input("Salário Bruto (R$)", 3000.0)
+        salario = st.number_input("Salário Bruto (R$)", value=3000.0, min_value=0.0)
         regime = st.selectbox("Regime",
                               ["CLT (Simples Nacional)",
                                "CLT (Lucro Presumido/Real)",
                                "PJ"])
         incluir = st.checkbox("Provisionar Férias e 13º", True)
 
+    # Parâmetros adicionais para Lucro Presumido/Real
+    rat_perc = 2.0
+    terceiros_perc = 5.8
+    
+    if regime == "CLT (Lucro Presumido/Real)":
+        with st.expander("🏭 Encargos Específicos"):
+            rat_perc = st.number_input("RAT - Risco Ambiental do Trabalho (%)", value=2.0, min_value=1.0, max_value=3.0, step=0.5)
+            terceiros_perc = st.number_input("Terceiros/Sistema S (%)", value=5.8, min_value=0.0, max_value=10.0, step=0.1)
+            st.info(f"Teto INSS 2025: R$ {TETO_INSS_2025:,.2f}")
+
     with st.expander("🚌 Transporte e Alimentação"):
-        v_pass = st.number_input("Valor Passagem", 5.5)
-        n_pass = st.number_input("Passagens/Dia", 2)
-        vr = st.number_input("Vale Refeição", 550.0)
-        va = st.number_input("Vale Alimentação", 250.0)
+        v_pass = st.number_input("Valor Passagem (R$)", value=5.50, min_value=0.0)
+        n_pass = st.number_input("Passagens/Dia", value=2, min_value=0)
+        vr = st.number_input("Vale Refeição (R$)", value=550.0, min_value=0.0)
+        va = st.number_input("Vale Alimentação (R$)", value=250.0, min_value=0.0)
 
     with st.expander("🏥 Saúde e Seguros"):
-        saude = st.number_input("Plano Saúde", 0.0)
-        odonto = st.number_input("Plano Odonto", 0.0)
-        seguro = st.number_input("Seguro Vida", 0.0)
+        saude = st.number_input("Plano Saúde (R$)", value=0.0, min_value=0.0)
+        odonto = st.number_input("Plano Odonto (R$)", value=0.0, min_value=0.0)
+        seguro = st.number_input("Seguro Vida (R$)", value=0.0, min_value=0.0)
 
     with st.expander("💻 Outros Custos e Infra"):
-        home = st.number_input("Auxílio Home Office", 0.0)
-        epi = st.number_input("EPI/Equipamentos", 0.0)
-        outros = st.number_input("Outros Custos", 0.0)
+        home = st.number_input("Auxílio Home Office (R$)", value=0.0, min_value=0.0)
+        epi = st.number_input("EPI/Equipamentos (R$)", value=0.0, min_value=0.0)
+        outros = st.number_input("Outros Custos (R$)", value=0.0, min_value=0.0)
 
     st.write("---")
 
@@ -131,7 +169,8 @@ with tab1:
         salario, regime, incluir,
         n_pass, v_pass, vr, va,
         saude, odonto, seguro,
-        home, epi, outros
+        home, epi, outros,
+        rat_perc, terceiros_perc
     )
 
     c1, c2, c3 = st.columns(3)
@@ -142,6 +181,7 @@ with tab1:
     mult = res['Custo Total Mensal'] / salario if salario else 0
     c3.metric("Multiplicador Real", f"{mult:.2f}x")
 
+    # Exibir detalhamento
     df = pd.DataFrame(res.items(), columns=["Descrição", "Valor"])
     df = df[(df["Valor"] > 0) & (~df["Descrição"].str.contains("Total"))]
 
@@ -166,7 +206,8 @@ with tab2:
                     x, regime, incluir,
                     n_pass, v_pass, vr, va,
                     saude, odonto, seguro,
-                    home, epi, outros
+                    home, epi, outros,
+                    rat_perc, terceiros_perc
                 )
             )
 
