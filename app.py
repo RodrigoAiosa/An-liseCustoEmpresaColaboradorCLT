@@ -331,7 +331,7 @@ with tab1:
         df_grafico = df_grafico[
             (df_grafico["Valor"] > 0) & 
             (~df_grafico["Descrição"].str.contains("Total")) &
-            (~df_grafico["Descrição"].startswith("_")) &
+            (~df_grafico["Descrição"].str.startswith("_")) &
             (df_grafico["Descrição"] != "Salário Base")
         ]
         
@@ -362,7 +362,7 @@ with tab1:
     # Tabela detalhada
     st.subheader("📑 Detalhamento de Custos")
     df = pd.DataFrame(res.items(), columns=["Descrição", "Valor"])
-    df = df[(df["Valor"] > 0) & (~df["Descrição"].str.contains("Total")) & (~df["Descrição"].startswith("_"))]
+    df = df[(df["Valor"] > 0) & (~df["Descrição"].str.contains("Total")) & (~df["Descrição"].str.startswith("_"))]
     
     df["Percentual"] = df["Valor"].apply(lambda x: f"{(x/res['Custo Total Mensal']*100):.1f}%" if res['Custo Total Mensal'] > 0 else "0%")
     df["Valor"] = df["Valor"].apply(lambda x: f"R$ {x:,.2f}")
