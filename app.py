@@ -158,6 +158,7 @@ with tab2:
         st.success("Planilha carregada")
 
         coluna_salario = st.selectbox("Coluna salário", df_input.columns)
+        coluna_grupo = st.selectbox("Coluna para consolidar relatório", df_input.columns)
 
         if st.button("Calcular"):
             resultados = df_input[coluna_salario].apply(
@@ -172,8 +173,24 @@ with tab2:
             df_final = pd.concat([df_input, pd.DataFrame(list(resultados))], axis=1)
             st.dataframe(df_final)
 
+            # -------- RELATÓRIO CONSOLIDADO --------
+            relatorio = (
+                df_final
+                .groupby(coluna_grupo)["Custo Total Anual"]
+                .sum()
+                .reset_index()
+                .sort_values("Custo Total Anual", ascending=False)
+            )
+
+            st.subheader("Relatório Consolidado")
+            st.dataframe(relatorio)
+
+            # -------- EXPORTAÇÃO EXCEL COM 2 ABAS --------
             output = BytesIO()
-            df_final.to_excel(output, index=False)
+
+            with pd.ExcelWriter(output, engine="openpyxl") as writer:
+                df_final.to_excel(writer, sheet_name="detalhe_custo", index=False)
+                relatorio.to_excel(writer, sheet_name="relatorio", index=False)
 
             st.download_button(
                 "Baixar Excel",
