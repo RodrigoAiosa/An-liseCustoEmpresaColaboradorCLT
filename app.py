@@ -230,7 +230,7 @@ with st.sidebar:
         dependentes = st.number_input("Número de Dependentes (IR)", value=0, min_value=0, max_value=10)
 
     # Preset de benefícios
-    with st.expander("🎁 Preset de Benefícios"):
+    with st.expander("🎁 Benefícios"):
         preset_selecionado = st.selectbox("Área/Função", list(PRESETS_BENEFICIOS.keys()))
         
         if preset_selecionado != "Personalizado":
@@ -639,3 +639,4 @@ with tab4:
                     "relatorio_custos_funcionarios.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
+
