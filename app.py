@@ -3,182 +3,180 @@ import pandas as pd
 import urllib.parse
 from io import BytesIO
 
-st.set_page_config(page_title="Calculadora Expert de Custo de Funcionário", page_icon="📊", layout="wide")
+# ---------------- CONFIGURAÇÃO ----------------
+st.set_page_config(
+    page_title="Calculadora Expert de Custo de Funcionário",
+    page_icon="📊",
+    layout="wide"
+)
 
 # ---------------- CSS ----------------
 st.markdown("""
 <style>
 div[data-testid="stMetric"] {
-    background-color: rgba(255, 255, 255, 0.05);
+    background-color: rgba(255,255,255,0.05);
     padding: 20px;
     border-radius: 15px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    transition: 0.3s;
+    border: 1px solid rgba(255,255,255,0.1);
+    transition: all .3s ease;
 }
 div[data-testid="stMetric"]:hover {
     border-color: #4CAF50 !important;
-    box-shadow: 0px 0px 20px rgba(76, 175, 80, 0.6);
+    box-shadow: 0px 0px 25px rgba(76,175,80,.6);
+    transform: translateY(-6px);
 }
-[data-testid="stMetricValue"] { font-size: 2rem !important; font-weight: 800 !important; }
+[data-testid="stMetricValue"] {
+    font-size: 2rem !important;
+    font-weight: 800 !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
-# ---------------- FUNÇÃO ----------------
-def calcular_custos_detalhado(
-    salario_bruto, regime, ferias_13,
-    passagens_dia, valor_passagem,
-    vr, va, saude, odonto, seguro_vida,
-    aux_home, epi_ferramentas, outros
-):
-
+# ---------------- FUNÇÃO DE CÁLCULO ----------------
+def calcular_custos(salario, regime, incluir, n_pass, v_pass, vr, va, saude, odonto, seguro, home, epi, outros):
     custos = {}
 
     if "CLT" in regime:
 
-        p_13 = salario_bruto / 12 if ferias_13 else 0
-        p_ferias = ((salario_bruto / 12) * 1.3333) if ferias_13 else 0
-        fgts = salario_bruto * 0.08
-        multa_fgts = fgts * 0.40
+        decimo = salario / 12 if incluir else 0
+        ferias = ((salario / 12) + ((salario / 3) / 12)) if incluir else 0
+        fgts = salario * 0.08
+        multa = fgts * 0.40
 
-        inss_patronal = 0
+        vt_total = (n_pass * v_pass) * 22
+        desc = salario * 0.06
+        vt = max(0, vt_total - desc)
+
+        inss = 0
         rat = 0
-
         if regime == "CLT (Lucro Presumido/Real)":
-            inss_patronal = salario_bruto * 0.20
-            rat = salario_bruto * 0.078
-
-        custo_vt = (passagens_dia * valor_passagem) * 22
-        desconto_6 = salario_bruto * 0.06
-        vt_empresa = max(0, custo_vt - desconto_6)
+            inss = salario * 0.20
+            rat = salario * 0.078
 
         custos = {
-            "Salário Base": salario_bruto,
-            "13º (Provisão)": p_13,
-            "Férias + 1/3 (Provisão)": p_ferias,
-            "FGTS": fgts,
-            "Provisão Multa FGTS": multa_fgts,
-            "INSS Patronal": inss_patronal,
-            "RAT/Sistema S": rat,
-            "Vale Transporte": vt_empresa,
+            "13º Salário (Provisão)": decimo,
+            "Férias + 1/3 (Provisão)": ferias,
+            "FGTS Mensal": fgts,
+            "Provisão Multa FGTS (40%)": multa,
+            "INSS Patronal": inss,
+            "RAT/Sistema S/Terceiros": rat,
+            "Vale Transporte (Custo Empresa)": vt,
             "Vale Refeição": vr,
             "Vale Alimentação": va,
-            "Plano Saúde": saude,
-            "Plano Odonto": odonto,
-            "Seguro Vida": seguro_vida,
-            "Auxílio Home Office": aux_home,
-            "EPI/Equipamentos": epi_ferramentas,
+            "Plano de Saúde": saude,
+            "Plano Odontológico": odonto,
+            "Seguro de Vida": seguro,
+            "Auxílio Home Office": home,
+            "Equipamentos/EPI": epi,
             "Outros Custos": outros,
         }
 
-    else:  # PJ
-
+    else:
         custos = {
-            "Nota Fiscal": salario_bruto,
-            "VR/VA": vr + va,
-            "Saúde/Seguros": saude + odonto + seguro_vida,
-            "Infraestrutura": aux_home + epi_ferramentas + outros,
+            "Valor Nota Fiscal": salario,
+            "Benefícios": vr + va,
+            "Saúde/Seguros": saude + odonto + seguro,
+            "Infraestrutura": home + epi + outros,
         }
 
-    total_mensal = sum(custos.values())
-    custos["Custo Total Mensal"] = total_mensal
-    custos["Custo Total Anual"] = total_mensal * 12
+    total = sum(custos.values())
+    custos["Custo Total Mensal"] = total
+    custos["Custo Total Anual"] = total * 12
 
     return custos
 
 # ---------------- SIDEBAR ----------------
 with st.sidebar:
 
-    st.header("⚙️ Parâmetros")
+    st.header("⚙️ Parâmetros Detalhados")
 
-    salario = st.number_input("Salário Bruto (R$)", value=3000.0)
-    regime = st.selectbox("Regime",
-        ["CLT (Simples Nacional)", "CLT (Lucro Presumido/Real)", "PJ"])
-    incluir = st.checkbox("Provisionar Férias e 13º", True)
+    with st.expander("📌 Dados Contratuais", expanded=True):
+        salario = st.number_input("Salário Bruto (R$)", 3000.0)
+        regime = st.selectbox("Regime",
+                              ["CLT (Simples Nacional)",
+                               "CLT (Lucro Presumido/Real)",
+                               "PJ"])
+        incluir = st.checkbox("Provisionar Férias e 13º", True)
 
-    st.subheader("Transporte")
-    v_passagem = st.number_input("Valor Passagem", value=5.5)
-    n_pass = st.number_input("Passagens/Dia", value=2)
+    with st.expander("🚌 Transporte e Alimentação"):
+        v_pass = st.number_input("Valor Passagem", 5.5)
+        n_pass = st.number_input("Passagens/Dia", 2)
+        vr = st.number_input("Vale Refeição", 550.0)
+        va = st.number_input("Vale Alimentação", 250.0)
 
-    st.subheader("Benefícios")
-    vr = st.number_input("Vale Refeição", value=550.0)
-    va = st.number_input("Vale Alimentação", value=250.0)
+    with st.expander("🏥 Saúde e Seguros"):
+        saude = st.number_input("Plano Saúde", 0.0)
+        odonto = st.number_input("Plano Odonto", 0.0)
+        seguro = st.number_input("Seguro Vida", 0.0)
 
-    st.subheader("Saúde/Seguros")
-    saude = st.number_input("Plano Saúde", value=0.0)
-    odonto = st.number_input("Plano Odonto", value=0.0)
-    seguro = st.number_input("Seguro Vida", value=0.0)
+    with st.expander("💻 Outros Custos e Infra"):
+        home = st.number_input("Auxílio Home Office", 0.0)
+        epi = st.number_input("EPI/Equipamentos", 0.0)
+        outros = st.number_input("Outros Custos", 0.0)
 
-    st.subheader("Infra")
-    home = st.number_input("Auxílio Home Office", value=0.0)
-    epi = st.number_input("EPI/Equipamentos", value=0.0)
-    outros = st.number_input("Outros Custos", value=0.0)
+    st.write("---")
+
+    msg = urllib.parse.quote("Olá Rodrigo! Gostaria de validar a calculadora.")
+    st.markdown(f"[WhatsApp](https://wa.me/11977019335?text={msg})")
 
 # ---------------- TABS ----------------
 tab1, tab2 = st.tabs(["👤 Cálculo Individual", "📁 Processar Planilha"])
 
-# ---------------- ABA INDIVIDUAL ----------------
+# ---------------- CÁLCULO INDIVIDUAL ----------------
 with tab1:
 
-    res = calcular_custos_detalhado(
+    st.subheader(f"Análise de Custo: {regime}")
+
+    res = calcular_custos(
         salario, regime, incluir,
-        n_pass, v_passagem,
-        vr, va, saude, odonto, seguro,
+        n_pass, v_pass, vr, va,
+        saude, odonto, seguro,
         home, epi, outros
     )
 
-    col1, col2, col3 = st.columns(3)
+    c1, c2, c3 = st.columns(3)
 
-    col1.metric("Custo Mensal", f"R$ {res['Custo Total Mensal']:,.2f}")
-    col2.metric("Custo Anual", f"R$ {res['Custo Total Anual']:,.2f}")
-    mult = res["Custo Total Mensal"]/salario if salario > 0 else 0
-    col3.metric("Multiplicador", f"{mult:.2f}x")
+    c1.metric("Custo Total Mensal", f"R$ {res['Custo Total Mensal']:,.2f}")
+    c2.metric("Custo Total Anual", f"R$ {res['Custo Total Anual']:,.2f}")
+
+    mult = res['Custo Total Mensal'] / salario if salario else 0
+    c3.metric("Multiplicador Real", f"{mult:.2f}x")
 
     df = pd.DataFrame(res.items(), columns=["Descrição", "Valor"])
-    df = df[~df["Descrição"].str.contains("Total")]
+    df = df[(df["Valor"] > 0) & (~df["Descrição"].str.contains("Total"))]
 
-    st.dataframe(df.style.format({"Valor": "R$ {:,.2f}"}), use_container_width=True)
+    df["Valor"] = df["Valor"].apply(lambda x: f"R$ {x:,.2f}")
+    st.dataframe(df, use_container_width=True, hide_index=True)
 
-# ---------------- ABA LOTE ----------------
+# ---------------- PROCESSAR PLANILHA ----------------
 with tab2:
 
-    arquivo = st.file_uploader("Enviar planilha", type=["xlsx", "csv"])
+    arquivo = st.file_uploader("Suba sua planilha", type=["xlsx", "csv"])
 
     if arquivo:
-
         df_input = pd.read_excel(arquivo) if arquivo.name.endswith("xlsx") else pd.read_csv(arquivo)
+        st.success("Planilha carregada")
 
-        coluna_sal = st.selectbox("Coluna Salário", df_input.columns)
-        coluna_dep = st.selectbox("Coluna Departamento", df_input.columns)
+        coluna_salario = st.selectbox("Coluna salário", df_input.columns)
 
         if st.button("Calcular"):
-
-            resultados = df_input[coluna_sal].apply(
-                lambda x: calcular_custos_detalhado(
+            resultados = df_input[coluna_salario].apply(
+                lambda x: calcular_custos(
                     x, regime, incluir,
-                    n_pass, v_passagem,
-                    vr, va, saude, odonto, seguro,
+                    n_pass, v_pass, vr, va,
+                    saude, odonto, seguro,
                     home, epi, outros
                 )
             )
 
-            df_resultados = pd.DataFrame(resultados.tolist())
-
-            df_final = pd.concat([df_input, df_resultados], axis=1)
-
-            resumo = df_final.groupby(coluna_dep)["Custo Total Anual"].sum().reset_index()
-
-            st.dataframe(resumo.style.format(
-                {"Custo Total Anual": "R$ {:,.2f}"}
-            ))
+            df_final = pd.concat([df_input, pd.DataFrame(list(resultados))], axis=1)
+            st.dataframe(df_final)
 
             output = BytesIO()
-
-            with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
-                df_final.to_excel(writer, index=False, sheet_name="Detalhado")
-                resumo.to_excel(writer, index=False, sheet_name="Resumo")
+            df_final.to_excel(output, index=False)
 
             st.download_button(
                 "Baixar Excel",
-                data=output.getvalue(),
-                file_name="relatorio_custos.xlsx"
+                output.getvalue(),
+                "custos_funcionarios.xlsx"
             )
