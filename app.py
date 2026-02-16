@@ -466,7 +466,7 @@ with tab3:
         horas_mes = st.number_input("Horas trabalhadas/mês", value=160.0, min_value=0.0, step=10.0)
     
     with col2:
-        margem_desejada = st.slider("Margem de lucro desejada (%)", 0, 100, 30)
+        margem_desejada = st.slider("Margem de lucro desejada (%)", 0, 99, 30)
     
     if receita_hora > 0 and horas_mes > 0:
         receita_total = receita_hora * horas_mes
@@ -482,48 +482,59 @@ with tab3:
         c3.metric("📈 Lucro Bruto", f"R$ {lucro_bruto:,.2f}", 
                   delta=f"{margem_real:.1f}%")
         
-        receita_necessaria = custo_total / (1 - margem_desejada/100)
-        c4.metric("🎯 Receita p/ Margem", f"R$ {receita_necessaria:,.2f}")
+        # Calcular receita necessária evitando divisão por zero
+        if margem_desejada < 100:
+            receita_necessaria = custo_total / (1 - margem_desejada/100)
+        else:
+            receita_necessaria = float('inf')
+        
+        if receita_necessaria != float('inf'):
+            c4.metric("🎯 Receita p/ Margem", f"R$ {receita_necessaria:,.2f}")
+        else:
+            c4.metric("🎯 Receita p/ Margem", "∞")
         
         # Gráfico de barras empilhadas
-        fig = go.Figure()
-        
-        fig.add_trace(go.Bar(
-            name='Custo',
-            x=['Atual', f'Meta ({margem_desejada}%)'],
-            y=[custo_total, custo_total],
-            marker_color='#FF6B6B',
-            text=[f'R$ {custo_total:,.0f}', f'R$ {custo_total:,.0f}'],
-            textposition='inside'
-        ))
-        
-        fig.add_trace(go.Bar(
-            name='Lucro',
-            x=['Atual', f'Meta ({margem_desejada}%)'],
-            y=[lucro_bruto, receita_necessaria - custo_total],
-            marker_color='#4CAF50',
-            text=[f'R$ {lucro_bruto:,.0f}', f'R$ {(receita_necessaria - custo_total):,.0f}'],
-            textposition='inside'
-        ))
-        
-        fig.update_layout(
-            barmode='stack',
-            title='Análise de Receita vs Custo',
-            yaxis_title='Valor (R$)',
-            height=400
-        )
-        
-        st.plotly_chart(fig, use_container_width=True)
-        
-        # Recomendações
-        if margem_real < margem_desejada:
-            diferenca = receita_necessaria - receita_total
-            st.warning(f"⚠️ Para atingir {margem_desejada}% de margem, é necessário aumentar a receita em R$ {diferenca:,.2f}/mês")
+        if receita_necessaria != float('inf'):
+            fig = go.Figure()
             
-            horas_necessarias = receita_necessaria / receita_hora
-            st.info(f"💡 Isso equivale a trabalhar {horas_necessarias:.0f} horas/mês (ou R$ {(receita_necessaria/horas_mes):.2f}/hora em {horas_mes:.0f}h)")
+            fig.add_trace(go.Bar(
+                name='Custo',
+                x=['Atual', f'Meta ({margem_desejada}%)'],
+                y=[custo_total, custo_total],
+                marker_color='#FF6B6B',
+                text=[f'R$ {custo_total:,.0f}', f'R$ {custo_total:,.0f}'],
+                textposition='inside'
+            ))
+            
+            fig.add_trace(go.Bar(
+                name='Lucro',
+                x=['Atual', f'Meta ({margem_desejada}%)'],
+                y=[lucro_bruto, receita_necessaria - custo_total],
+                marker_color='#4CAF50',
+                text=[f'R$ {lucro_bruto:,.0f}', f'R$ {(receita_necessaria - custo_total):,.0f}'],
+                textposition='inside'
+            ))
+            
+            fig.update_layout(
+                barmode='stack',
+                title='Análise de Receita vs Custo',
+                yaxis_title='Valor (R$)',
+                height=400
+            )
+            
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Recomendações
+            if margem_real < margem_desejada:
+                diferenca = receita_necessaria - receita_total
+                st.warning(f"⚠️ Para atingir {margem_desejada}% de margem, é necessário aumentar a receita em R$ {diferenca:,.2f}/mês")
+                
+                horas_necessarias = receita_necessaria / receita_hora
+                st.info(f"💡 Isso equivale a trabalhar {horas_necessarias:.0f} horas/mês (ou R$ {(receita_necessaria/horas_mes):.2f}/hora em {horas_mes:.0f}h)")
+            else:
+                st.success(f"✅ Margem atual ({margem_real:.1f}%) está acima da meta de {margem_desejada}%!")
         else:
-            st.success(f"✅ Margem atual ({margem_real:.1f}%) está acima da meta de {margem_desejada}%!")
+            st.error("⚠️ Margem de 100% não é possível. Ajuste para um valor menor que 100%.")
     else:
         st.info("👆 Preencha os campos acima para calcular o ponto de equilíbrio")
 
