@@ -145,7 +145,6 @@ def calcular_custos(salario, regime, incluir, n_pass, v_pass, vr, va, saude, odo
             terceiros = base_inss * (terceiros_perc / 100)
 
         custos = {
-            "Salário Base": salario,
             "13º Salário (Provisão Mensal)": decimo,
             "Férias + 1/3 (Provisão Mensal)": ferias,
             "FGTS Mensal (8%)": fgts,
@@ -639,4 +638,5 @@ with tab4:
                     "relatorio_custos_funcionarios.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
+
 
