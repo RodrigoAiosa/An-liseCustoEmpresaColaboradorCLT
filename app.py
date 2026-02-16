@@ -172,6 +172,7 @@ def calcular_custos(salario, regime, incluir, n_pass, v_pass, vr, va, saude, odo
         custos["_salario_liquido"] = salario_liquido
         custos["_inss_funcionario"] = inss_func
         custos["_irrf_funcionario"] = irrf_func
+        custos["_desconto_vt"] = desc_real
 
     else:  # PJ
         custos = {
@@ -330,7 +331,7 @@ with tab1:
         df_grafico = df_grafico[
             (df_grafico["Valor"] > 0) & 
             (~df_grafico["Descrição"].str.contains("Total")) &
-            (~df_grafico["Descrição"].str.startswith("_")) &
+            (~df_grafico["Descrição"].startswith("_")) &
             (df_grafico["Descrição"] != "Salário Base")
         ]
         
@@ -353,11 +354,9 @@ with tab1:
         if "CLT" in regime:
             st.metric("INSS Funcionário", f"R$ {res.get('_inss_funcionario', 0):,.2f}")
             st.metric("IRRF", f"R$ {res.get('_irrf_funcionario', 0):,.2f}")
+            st.metric("Desconto VT", f"R$ {res.get('_desconto_vt', 0):,.2f}")
             
-            desconto_vt = min(custo_vt_mensal, salario * 0.06)
-            st.metric("Desconto VT", f"R$ {desconto_vt:,.2f}")
-            
-            total_descontos = res.get('_inss_funcionario', 0) + res.get('_irrf_funcionario', 0) + desconto_vt
+            total_descontos = res.get('_inss_funcionario', 0) + res.get('_irrf_funcionario', 0) + res.get('_desconto_vt', 0)
             st.metric("Total Descontos", f"R$ {total_descontos:,.2f}", delta=f"-{(total_descontos/salario*100):.1f}%")
 
     # Tabela detalhada
@@ -432,13 +431,15 @@ with tab2:
         x=df_comp['Regime'],
         y=df_comp['Custo Mensal'],
         text=df_comp['Custo Mensal'].apply(lambda x: f'R$ {x:,.2f}'),
-        textposition='outside'
+        textposition='outside',
+        marker_color=['#4CAF50', '#FFC107', '#2196F3']
     ))
     
     fig.update_layout(
         title='Comparação de Custos Mensais',
         yaxis_title='Valor (R$)',
-        height=400
+        height=400,
+        showlegend=False
     )
     
     st.plotly_chart(fig, use_container_width=True)
@@ -491,14 +492,18 @@ with tab3:
             name='Custo',
             x=['Atual', f'Meta ({margem_desejada}%)'],
             y=[custo_total, custo_total],
-            marker_color='#FF6B6B'
+            marker_color='#FF6B6B',
+            text=[f'R$ {custo_total:,.0f}', f'R$ {custo_total:,.0f}'],
+            textposition='inside'
         ))
         
         fig.add_trace(go.Bar(
             name='Lucro',
             x=['Atual', f'Meta ({margem_desejada}%)'],
             y=[lucro_bruto, receita_necessaria - custo_total],
-            marker_color='#4CAF50'
+            marker_color='#4CAF50',
+            text=[f'R$ {lucro_bruto:,.0f}', f'R$ {(receita_necessaria - custo_total):,.0f}'],
+            textposition='inside'
         ))
         
         fig.update_layout(
@@ -613,4 +618,3 @@ with tab4:
                     "relatorio_custos_funcionarios.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
-
