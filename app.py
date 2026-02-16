@@ -330,7 +330,7 @@ with tab1:
         df_grafico = df_grafico[
             (df_grafico["Valor"] > 0) & 
             (~df_grafico["Descrição"].str.contains("Total")) &
-            (~df_grafico["Descrição"].startswith("_")) &
+            (~df_grafico["Descrição"].str.startswith("_")) &
             (df_grafico["Descrição"] != "Salário Base")
         ]
         
@@ -613,3 +613,4 @@ with tab4:
                     "relatorio_custos_funcionarios.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
+
